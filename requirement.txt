@@ -1,6 +1,6 @@
-streamlit
+streamlit==1.35.0
 opencv-python
 numpy
 easyocr
-streamlit-webrtc
-av
+streamlit-webrtc==0.45.0
+av==10.0.0
