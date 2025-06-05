@@ -1,0 +1,6 @@
+txt
+streamlit
+opencv-python
+numpy
+streamlit-webrtc
+easyocr
