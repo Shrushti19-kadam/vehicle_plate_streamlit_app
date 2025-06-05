@@ -1,8 +1,12 @@
-import streamlit as st
+import sys
+import streamlit as st 
 from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration, WebRtcMode
 import av
 from detect_plate import detect_plate_from_frame
 from streamlit_webrtc import WebRtcMode
+
+# Python executable path तपासण्यासाठी
+st.write("Python executable path:", sys.executable)
 
 st.title("🚗 Live Number Plate Detection (EasyOCR)")
 st.markdown("This app detects vehicle plates using your browser's webcam.")
