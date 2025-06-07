@@ -1,51 +1,27 @@
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer
-import cv2
-import numpy as np
-import easyocr
-import time
+from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration, WebRtcMode
+import av
+from detect_plate import detect_plate_from_frame
+from streamlit_webrtc import WebRtcMode
 
-# Title and intro
-st.title("🚘 Live Number Plate Detection App")
-st.write("🔍 Using EasyOCR + Streamlit-WebRTC")
+st.title("🚗 Live Number Plate Detection (EasyOCR)")
+st.markdown("This app detects vehicle plates using your browser's webcam.")
 
-# Initialize OCR reader once
-reader = easyocr.Reader(['en'])
+RTC_CONFIGURATION = RTCConfiguration({
+    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
+})
 
-# Store last detected text and time globally
-last_text = ""
-last_detection_time = 0
-TIMEOUT = 5  # seconds to wait before allowing same plate again
+class PlateProcessor(VideoProcessorBase):
+    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
+        img = frame.to_ndarray(format="bgr24")
+        processed_img = detect_plate_from_frame(img)
+        return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
 
-def ocr_on_frame(frame):
-    global last_text, last_detection_time
-    img = frame.to_ndarray(format="bgr24")
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    result = reader.readtext(gray)
-
-    current_time = time.time()
-    for detection in result:
-        bbox, text, conf = detection
-        if conf > 0.85 and (text != last_text or current_time - last_detection_time > TIMEOUT):
-            last_text = text
-            last_detection_time = current_time
-
-            # Draw bounding box
-            top_left = tuple([int(val) for val in bbox[0]])
-            bottom_right = tuple([int(val) for val in bbox[2]])
-            cv2.rectangle(img, top_left, bottom_right, (0, 255, 0), 2)
-            cv2.putText(img, text, (top_left[0], top_left[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 0), 3)
-
-    return img
-
-def video_frame_callback(frame):
-    img = ocr_on_frame(frame)
-    return img
-
-# Start webcam with Streamlit-WebRTC
 webrtc_streamer(
-    key="example",
-    video_frame_callback=video_frame_callback,
+    key="vehicle-detection",
+    mode=WebRtcMode.SENDRECV,  # ✅ Add this line!
+    video_processor_factory=PlateProcessor,
+    rtc_configuration=RTC_CONFIGURATION,
     media_stream_constraints={"video": True, "audio": False},
-    async_processing=True,
+    async_processing=True
 )
