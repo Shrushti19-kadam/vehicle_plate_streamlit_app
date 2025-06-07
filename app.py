@@ -1,31 +1,44 @@
-import sys
-import streamlit as st 
-from streamlit_webrtc import webrtc_streamer, VideoProcessorBase, RTCConfiguration, WebRtcMode
-import av
-from detect_plate import detect_plate_from_frame
-from streamlit_webrtc import WebRtcMode
+import streamlit as st
+from streamlit_webrtc import webrtc_streamer
+import cv2
+import numpy as np
+import easyocr
 
-# Python executable path तपासण्यासाठी
-st.write("Python executable path:", sys.executable)
+# Initialize OCR reader once
+reader = easyocr.Reader(['en'])
 
-st.title("🚗 Live Number Plate Detection (EasyOCR)")
-st.markdown("This app detects vehicle plates using your browser's webcam.")
+# Store last detected text globally
+last_text = ""
 
-RTC_CONFIGURATION = RTCConfiguration({
-    "iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]
-})
+def ocr_on_frame(frame):
+    global last_text
+    img = frame.to_ndarray(format="bgr24")
 
-class PlateProcessor(VideoProcessorBase):
-    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-        img = frame.to_ndarray(format="bgr24")
-        processed_img = detect_plate_from_frame(img)
-        return av.VideoFrame.from_ndarray(processed_img, format="bgr24")
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    result = reader.readtext(gray)
+
+    for detection in result:
+        bbox, text, conf = detection
+        if conf > 0.85 and text != last_text:
+            last_text = text  # Update the last_text
+            # Draw bounding box
+            top_left = tuple([int(val) for val in bbox[0]])
+            bottom_right = tuple([int(val) for val in bbox[2]])
+            cv2.rectangle(img, top_left, bottom_right, (0, 255, 0), 2)
+            cv2.putText(img, text, top_left, cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+    return img
+
+def video_frame_callback(frame):
+    img = ocr_on_frame(frame)
+    return img
+
+st.title("Live Vehicle Plate Detection with Streamlit-WebRTC")
 
 webrtc_streamer(
-    key="vehicle-detection",
-    mode=WebRtcMode.SENDRECV,  # ✅ Add this line!
-    video_processor_factory=PlateProcessor,
-    rtc_configuration=RTC_CONFIGURATION,
+    key="example",
+    video_frame_callback=video_frame_callback,
     media_stream_constraints={"video": True, "audio": False},
-    async_processing=True
+    async_processing=True,
 )
+
